@@ -14,6 +14,17 @@ public:
     explicit DrawAndChatServer(quint16 port, QObject *parent = nullptr);
     ~DrawAndChatServer();
 
+    enum Error
+    {
+        NoError = 0,
+        InvaildArgument,
+        NoThisUser,
+        RoomNotFound,
+        RoomExisting,
+        ClientNotFound
+    };
+    Q_ENUMS(Error)
+
 private:
 
     typedef QPair<QString, QString> ClientInfoPair;
@@ -25,9 +36,10 @@ private:
     QMap<QString, QMap<QString, QWebSocket *>> _roomUserIndexMap;
 
     static QJsonDocument MakeServerJson(const QString &operation, const QJsonObject &arguments);
-    void broadcastToUserInRoom(QWebSocket *user, const std::function<void(const QPair<QString,QWebSocket *>&)>& action);
+    void broadcastToUserInRoom(QWebSocket *user, const std::function<void(const UserIndexPair&)>& action);
+    void clearIndexInfo(QWebSocket *user);
 
-signals:
+private slots:
 
     void userLoginRoom(QWebSocket *user, const QString& inUserName, const QString& inRoomName, const QString& roomPassword);
     void userCreateRoom(QWebSocket *user, const QString& inUserName, const QString& inRoomName, const QString& roomPassword);
