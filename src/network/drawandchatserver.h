@@ -36,8 +36,10 @@ private:
     QMap<QString, QMap<QString, QWebSocket *>> _roomUserIndexMap;
 
     static QJsonDocument MakeServerJson(const QString &operation, const QJsonObject &arguments);
-    void broadcastToUserInRoom(QWebSocket *user, const std::function<void(const UserIndexPair&)>& action);
-    void clearIndexInfo(QWebSocket *user);
+    static void DebugOutput(QWebSocket *user, const QString& operation);
+
+    void broadcastToUserInRoom(QWebSocket *user, const std::function<void(QWebSocket*)>& action);
+    Error clearIndexInfo(QWebSocket *user);
 
 private slots:
 
@@ -53,7 +55,6 @@ private slots:
     void otherRemovePaintResponse(QWebSocket *user);
     void otherSendMessageResponse(QWebSocket *user);
 
-    void requestErrorMessage(QWebSocket *user, int errorState);
 
 private slots:
     void onNewConnection();
@@ -62,9 +63,12 @@ private slots:
     void onMessageReceived(const QByteArray &message);
     void onSocketDisconnected();
 
-public slots:
+signals:
+
     void newConnection();
     void closed();
+
+public slots:
 
     void userLoginRoomResponse(QWebSocket *user, int state);
     void userCreateRoomResponse(QWebSocket *user, int state);
@@ -77,8 +81,6 @@ public slots:
     void otherRemovePaint(QWebSocket *user, int id);
     void otherSendMessage(QWebSocket *user, const QString& inUserName, const QString& message);
     void otherLogoutRoom(QWebSocket *user, const QString& inUserName);
-
-    void requestErrorMessageResponse(QWebSocket *user, const QString& errorString);
 
 };
 

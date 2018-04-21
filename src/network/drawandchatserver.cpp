@@ -5,20 +5,22 @@
 #include <QJsonObject>
 #include <QJsonValue>
 
+#include <QDebug>
+
 DrawAndChatServer::DrawAndChatServer(quint16 port, QObject *parent) :
     QObject(parent),
     _webSocketServer("DrawAndChatServer", QWebSocketServer::NonSecureMode, this)
 {
-    if (_webSocketServer->listen(QHostAddress::Any, port))
+    if (_webSocketServer.listen(QHostAddress::Any, port))
     {
-        connect(m_pWebSocketServer, &QWebSocketServer::newConnection,this, &DrawAndChatServer::onNewConnection);
-        connect(m_pWebSocketServer, &QWebSocketServer::closed, this, &DrawAndChatServer::onClosed);
+        connect(&_webSocketServer, &QWebSocketServer::newConnection,this, &DrawAndChatServer::onNewConnection);
+        connect(&_webSocketServer, &QWebSocketServer::closed, this, &DrawAndChatServer::onClosed);
     }
 }
 
 DrawAndChatServer::~DrawAndChatServer()
 {
-    _webSocketServer->close();
+    _webSocketServer.close();
 }
 
 QJsonDocument DrawAndChatServer::MakeServerJson(const QString &operation, const QJsonObject &arguments)
@@ -35,7 +37,14 @@ QJsonDocument DrawAndChatServer::MakeServerJson(const QString &operation, const 
     };
 }
 
-Error DrawAndChatServer::clearIndexInfo(QWebSocket *user)
+void DrawAndChatServer::DebugOutput(QWebSocket *user, const QString &operation)
+{
+    qDebug()
+            << "[" << QDateTime::currentDateTime().toString("yyyy.MM.dd hh:mm:ss") << "]"
+            << user << ":" << operation;
+}
+
+DrawAndChatServer::Error DrawAndChatServer::clearIndexInfo(QWebSocket *user)
 {
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend() && !clientInfo->first.isNull())
@@ -207,7 +216,7 @@ void DrawAndChatServer::otherSendMessageResponse(QWebSocket *user)
 
 }
 
-void DrawAndChatServer::BroadcastToUserInRoom(QWebSocket *user, const std::function<void (const UserIndexPair &)> &action)
+void DrawAndChatServer::broadcastToUserInRoom(QWebSocket *user, const std::function<void (QWebSocket*)> &action)
 {
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend() && !clientInfo->first.isNull())
@@ -215,11 +224,11 @@ void DrawAndChatServer::BroadcastToUserInRoom(QWebSocket *user, const std::funct
         auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
         if(foundRoom != _roomUserIndexMap.cend())
         {
-            for(const UserIndexPair& userIndex : *foundRoom)
+            for(QWebSocket* user : *foundRoom)
             {
-                if(userIndex.second != user)
+                if(user != user)
                 {
-                    action(userIndex);
+                    action(user);
                 }
             }
         }
@@ -228,7 +237,9 @@ void DrawAndChatServer::BroadcastToUserInRoom(QWebSocket *user, const std::funct
 
 void DrawAndChatServer::onNewConnection()
 {
-    QWebSocket *socket = _webSocketServer->nextPendingConnection();
+    QWebSocket *socket = _webSocketServer.nextPendingConnection();
+
+    DebugOutput(socket, "NewConnection");
 
     connect(socket, &QWebSocket::binaryMessageReceived, this, &DrawAndChatServer::onMessageReceived);
     connect(socket, &QWebSocket::disconnected, this, &DrawAndChatServer::onSocketDisconnected);
@@ -262,7 +273,7 @@ void DrawAndChatServer::onMessageReceived(const QByteArray &message)
                     userCreateRoom(client, arg["userName"].toString(), arg["roomName"].toString(), arg["roomPassword"].toString());
                 }},
                 {"userPushPaint", [this,client](const QJsonObject& arg){
-                    userPushPaint(client, arg["paintState"].toInt(), arg["paintArguments"]);
+                    userPushPaint(client, arg["paintState"].toInt(), arg["paintArguments"].toObject());
                 }},
                 {"userRemovePaint", [this,client](const QJsonObject& arg){
                     userRemovePaint(client, arg["id"].toInt());
@@ -284,15 +295,14 @@ void DrawAndChatServer::onMessageReceived(const QByteArray &message)
                 }},
                 {"otherSendMessageResponse", [this,client](const QJsonObject& arg){
                     otherSendMessageResponse(client);
-                }},
-                {"requestErrorMessage", [this,client](const QJsonObject& arg){
-                    requestErrorMessage(client, arg["errorState"].toInt());
                 }}
             };
 
-            auto found = operationFunctions.find(json["operation"].toString());
+            auto operation = json["operation"].toString();
+            auto found = operationFunctions.find(operation);
             if(found != operationFunctions.cend())
             {
+                DebugOutput(client, operation);
                 (*found)(json["arguments"].toObject());
             }
         }
@@ -306,6 +316,9 @@ void DrawAndChatServer::onSocketDisconnected()
     clearIndexInfo(client);
 
     _clientInfoMap.remove(client);
+
+    DebugOutput(client, "Disconnected");
+
 }
 
 void DrawAndChatServer::userLoginRoomResponse(QWebSocket *user, int state)
@@ -363,8 +376,8 @@ void DrawAndChatServer::otherLoginRoom(QWebSocket *user, const QString &inUserNa
 
     QByteArray jsonBytes = json.toJson();
 
-    broadcastToUserInRoom(user, [&jsonBytes](const UserIndexPair& pair){
-        pair.second->sendBinaryMessage(jsonBytes);
+    broadcastToUserInRoom(user, [&jsonBytes](QWebSocket* user){
+        user->sendBinaryMessage(jsonBytes);
     });
 }
 
@@ -378,8 +391,8 @@ void DrawAndChatServer::otherPushPaint(QWebSocket *user, int id, int state, cons
 
     QByteArray jsonBytes = json.toJson();
 
-    broadcastToUserInRoom(user, [&jsonBytes](const UserIndexPair& pair){
-        pair.second->sendBinaryMessage(jsonBytes);
+    broadcastToUserInRoom(user, [&jsonBytes](QWebSocket* user){
+        user->sendBinaryMessage(jsonBytes);
     });
 }
 
@@ -391,8 +404,8 @@ void DrawAndChatServer::otherRemovePaint(QWebSocket *user, int id)
 
     QByteArray jsonBytes = json.toJson();
 
-    broadcastToUserInRoom(user, [&jsonBytes](const UserIndexPair& pair){
-        pair.second->sendBinaryMessage(jsonBytes);
+    broadcastToUserInRoom(user, [&jsonBytes](QWebSocket* user){
+        user->sendBinaryMessage(jsonBytes);
     });
 }
 
@@ -405,8 +418,8 @@ void DrawAndChatServer::otherSendMessage(QWebSocket *user, const QString &inUser
 
     QByteArray jsonBytes = json.toJson();
 
-    broadcastToUserInRoom(user, [&jsonBytes](const UserIndexPair& pair){
-        pair.second->sendBinaryMessage(jsonBytes);
+    broadcastToUserInRoom(user, [&jsonBytes](QWebSocket* user){
+        user->sendBinaryMessage(jsonBytes);
     });
 }
 
@@ -418,16 +431,7 @@ void DrawAndChatServer::otherLogoutRoom(QWebSocket *user, const QString &inUserN
 
     QByteArray jsonBytes = json.toJson();
 
-    broadcastToUserInRoom(user, [&jsonBytes](const UserIndexPair& pair){
-        pair.second->sendBinaryMessage(jsonBytes);
+    broadcastToUserInRoom(user, [&jsonBytes](QWebSocket* user){
+        user->sendBinaryMessage(jsonBytes);
     });
-}
-
-void DrawAndChatServer::requestErrorMessageResponse(QWebSocket *user, const QString &errorString)
-{
-    QJsonDocument json = MakeServerJson("requestErrorMessageResponse",QJsonObject{
-                                            {"errorString", errorString}
-                                        });
-
-    user->sendBinaryMessage(json.toJson());
 }
