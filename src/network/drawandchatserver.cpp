@@ -265,35 +265,35 @@ void DrawAndChatServer::onMessageReceived(const QByteArray &message)
     {
         if(json["name"] == NetworkInfo::ClientName && json["version"] == NetworkInfo::ClientVersion)
         {
-            static QMap<QString, std::function<void(const QJsonObject&)>> operationFunctions{
-                {"userLoginRoom", [this,client](const QJsonObject& arg){
+            static QMap<QString, std::function<void(QWebSocket*, const QJsonObject&)>> operationFunctions{
+                {"userLoginRoom", [this](QWebSocket* client, const QJsonObject& arg){
                     userLoginRoom(client, arg["userName"].toString(), arg["roomName"].toString(), arg["roomPassword"].toString());
                 }},
-                {"userCreateRoom", [this,client](const QJsonObject& arg){
+                {"userCreateRoom", [this](QWebSocket* client, const QJsonObject& arg){
                     userCreateRoom(client, arg["userName"].toString(), arg["roomName"].toString(), arg["roomPassword"].toString());
                 }},
-                {"userPushPaint", [this,client](const QJsonObject& arg){
+                {"userPushPaint", [this](QWebSocket* client, const QJsonObject& arg){
                     userPushPaint(client, arg["paintState"].toInt(), arg["paintArguments"].toObject());
                 }},
-                {"userRemovePaint", [this,client](const QJsonObject& arg){
+                {"userRemovePaint", [this](QWebSocket* client, const QJsonObject& arg){
                     userRemovePaint(client, arg["id"].toInt());
                 }},
-                {"userSendMessage", [this,client](const QJsonObject& arg){
+                {"userSendMessage", [this](QWebSocket* client, const QJsonObject& arg){
                     userSendMessage(client, arg["message"].toString());
                 }},
-                {"userLogoutRoom", [this,client](const QJsonObject& arg){
+                {"userLogoutRoom", [this](QWebSocket* client, const QJsonObject& arg){
                     userLogoutRoom(client);
                 }},
-                {"otherLoginRoomResponse", [this,client](const QJsonObject& arg){
+                {"otherLoginRoomResponse", [this](QWebSocket* client, const QJsonObject& arg){
                     otherLoginRoomResponse(client);
                 }},
-                {"otherPushPaintResponse", [this,client](const QJsonObject& arg){
+                {"otherPushPaintResponse", [this](QWebSocket* client, const QJsonObject& arg){
                     otherPushPaintResponse(client);
                 }},
-                {"otherRemovePaintResponse", [this,client](const QJsonObject& arg){
+                {"otherRemovePaintResponse", [this](QWebSocket* client, const QJsonObject& arg){
                     otherRemovePaintResponse(client);
                 }},
-                {"otherSendMessageResponse", [this,client](const QJsonObject& arg){
+                {"otherSendMessageResponse", [this](QWebSocket* client, const QJsonObject& arg){
                     otherSendMessageResponse(client);
                 }}
             };
@@ -303,7 +303,7 @@ void DrawAndChatServer::onMessageReceived(const QByteArray &message)
             if(found != operationFunctions.cend())
             {
                 DebugOutput(client, operation);
-                (*found)(json["arguments"].toObject());
+                (*found)(client, json["arguments"].toObject());
             }
         }
     }
