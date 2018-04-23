@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QMetaEnum>
 
 #include <QDebug>
 
@@ -47,15 +48,15 @@ void DrawAndChatServer::DebugOutput(QWebSocket *user, const QString &operation)
 DrawAndChatServer::Error DrawAndChatServer::clearIndexInfo(QWebSocket *user)
 {
     auto clientInfo = _clientInfoMap.find(user);
-    if(clientInfo != _clientInfoMap.cend() && !clientInfo->first.isNull())
+    if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull())
     {
-        auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
-        if(foundRoom != _roomUserIndexMap.cend() && !clientInfo->second.isNull())
+        auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+        if(foundRoom != _roomInfoMap.cend() && !clientInfo->userName.isNull())
         {
-            auto foundUser = foundRoom->find(clientInfo->second);
-            if(foundUser != foundRoom->cend())
+            auto foundUser = foundRoom->users.find(clientInfo->userName);
+            if(foundUser != foundRoom->users.cend())
             {
-                foundRoom->erase(foundUser);
+                foundRoom->users.erase(foundUser);
                 return Error::NoError;
             }
             return Error::NoThisUser;
@@ -75,30 +76,35 @@ void DrawAndChatServer::userLoginRoom(QWebSocket *user, const QString &inUserNam
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend())
     {
-        if(!clientInfo->first.isNull())
+        if(!clientInfo->roomName.isNull())
         {
-            auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
-            if(foundRoom != _roomUserIndexMap.cend() && !clientInfo->second.isNull())
+            auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+            if(foundRoom != _roomInfoMap.cend() && !clientInfo->userName.isNull())
             {
-                auto foundUser = foundRoom->find(clientInfo->second);
-                if(foundUser != foundRoom->cend())
+                auto foundUser = foundRoom->users.find(clientInfo->userName);
+                if(foundUser != foundRoom->users.cend())
                 {
-                    foundRoom->erase(foundUser);
+                    foundRoom->users.erase(foundUser);
                 }
             }
         }
 
-        auto foundNewRoom = _roomUserIndexMap.find(inRoomName);
-        if(foundNewRoom != _roomUserIndexMap.cend())
+        auto foundNewRoom = _roomInfoMap.find(inRoomName);
+        if(foundNewRoom != _roomInfoMap.cend())
         {
-            clientInfo->first = inRoomName;
-            clientInfo->second = inUserName;
+            auto foundUser = foundNewRoom->users.find(inUserName);
+            if(foundUser == foundNewRoom->users.cend())
+            {
+                clientInfo->roomName = inRoomName;
+                clientInfo->userName = inUserName;
 
-            foundNewRoom->insert(inUserName, user);
+                foundNewRoom->users.insert(inUserName, user);
 
-            otherLoginRoom(user, inUserName);
+                otherLoginRoom(user, inUserName);
 
-            userLoginRoomResponse(user, Error::NoError);
+                userLoginRoomResponse(user, Error::NoError);
+            }
+            else userLoginRoomResponse(user, Error::UserExisting);
         }
         else userLoginRoomResponse(user, Error::RoomNotFound);
     }
@@ -115,26 +121,26 @@ void DrawAndChatServer::userCreateRoom(QWebSocket *user, const QString &inUserNa
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend())
     {
-        if(!clientInfo->first.isNull())
+        if(!clientInfo->roomName.isNull())
         {
-            auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
-            if(foundRoom != _roomUserIndexMap.cend() && !clientInfo->second.isNull())
+            auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+            if(foundRoom != _roomInfoMap.cend() && !clientInfo->userName.isNull())
             {
-                auto foundUser = foundRoom->find(clientInfo->second);
-                if(foundUser != foundRoom->cend())
+                auto foundUser = foundRoom->users.find(clientInfo->userName);
+                if(foundUser != foundRoom->users.cend())
                 {
-                    foundRoom->erase(foundUser);
+                    foundRoom->users.erase(foundUser);
                 }
             }
         }
 
-        auto foundNewRoom = _roomUserIndexMap.find(inRoomName);
-        if(foundNewRoom == _roomUserIndexMap.cend())
+        auto foundNewRoom = _roomInfoMap.find(inRoomName);
+        if(foundNewRoom == _roomInfoMap.cend())
         {
-            clientInfo->first = inRoomName;
-            clientInfo->second = inUserName;
+            clientInfo->roomName = inRoomName;
+            clientInfo->userName = inUserName;
 
-            _roomUserIndexMap.insert(inRoomName, QMap<QString, QWebSocket *>{ {inUserName, user} });
+            _roomInfoMap.insert(inRoomName, RoomInfo(RoomInfo::UsersType{ {inUserName, user} }));
 
             userCreateRoomResponse(user, Error::NoError);
         }
@@ -161,9 +167,9 @@ void DrawAndChatServer::userSendMessage(QWebSocket *user, const QString &message
     }
 
     auto clientInfo = _clientInfoMap.find(user);
-    if(clientInfo != _clientInfoMap.cend() && !clientInfo->first.isNull() && !clientInfo->second.isNull())
+    if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull() && !clientInfo->userName.isNull())
     {
-        otherSendMessage(user, clientInfo->second, message);
+        otherSendMessage(user, clientInfo->userName, message);
 
         userSendMessageResponse(user, Error::NoError);
     }
@@ -175,23 +181,23 @@ void DrawAndChatServer::userLogoutRoom(QWebSocket *user)
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend())
     {
-        if(!clientInfo->first.isNull())
+        if(!clientInfo->roomName.isNull())
         {
-            auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
-            if(foundRoom != _roomUserIndexMap.cend() && !clientInfo->second.isNull())
+            auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+            if(foundRoom != _roomInfoMap.cend() && !clientInfo->userName.isNull())
             {
-                auto foundUser = foundRoom->find(clientInfo->second);
-                if(foundUser != foundRoom->cend())
+                auto foundUser = foundRoom->users.find(clientInfo->userName);
+                if(foundUser != foundRoom->users.cend())
                 {
-                    foundRoom->erase(foundUser);
+                    foundRoom->users.erase(foundUser);
 
-                    otherLogoutRoom(user, clientInfo->second);
+                    otherLogoutRoom(user, clientInfo->userName);
                 }
             }
         }
 
-        clientInfo->first.clear();
-        clientInfo->second.clear();
+        clientInfo->roomName.clear();
+        clientInfo->userName.clear();
     }
 
 }
@@ -219,16 +225,16 @@ void DrawAndChatServer::otherSendMessageResponse(QWebSocket *user)
 void DrawAndChatServer::broadcastToUserInRoom(QWebSocket *user, const std::function<void (QWebSocket*)> &action)
 {
     auto clientInfo = _clientInfoMap.find(user);
-    if(clientInfo != _clientInfoMap.cend() && !clientInfo->first.isNull())
+    if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull())
     {
-        auto foundRoom = _roomUserIndexMap.find(clientInfo->first);
-        if(foundRoom != _roomUserIndexMap.cend())
+        auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+        if(foundRoom != _roomInfoMap.cend())
         {
-            for(QWebSocket* user : *foundRoom)
+            for(QWebSocket* other : foundRoom->users)
             {
-                if(user != user)
+                if(other != user)
                 {
-                    action(user);
+                    action(other);
                 }
             }
         }
@@ -244,7 +250,7 @@ void DrawAndChatServer::onNewConnection()
     connect(socket, &QWebSocket::binaryMessageReceived, this, &DrawAndChatServer::onMessageReceived);
     connect(socket, &QWebSocket::disconnected, this, &DrawAndChatServer::onSocketDisconnected);
 
-    _clientInfoMap.insert(socket, ClientInfoPair{});
+    _clientInfoMap.insert(socket, ClientInfo());
 
     newConnection();
 }
@@ -324,7 +330,8 @@ void DrawAndChatServer::onSocketDisconnected()
 void DrawAndChatServer::userLoginRoomResponse(QWebSocket *user, int state)
 {
     QJsonDocument json = MakeServerJson("userLoginRoomResponse",QJsonObject{
-                                            {"state", state}
+                                            {"state", state},
+                                            {"error", QMetaEnum::fromType<Error>().valueToKey(state)}
                                         });
 
     user->sendBinaryMessage(json.toJson());
@@ -334,7 +341,8 @@ void DrawAndChatServer::userLoginRoomResponse(QWebSocket *user, int state)
 void DrawAndChatServer::userCreateRoomResponse(QWebSocket *user, int state)
 {
     QJsonDocument json = MakeServerJson("userCreateRoomResponse",QJsonObject{
-                                            {"state", state}
+                                            {"state", state},
+                                            {"error", QMetaEnum::fromType<Error>().valueToKey(state)}
                                         });
 
     user->sendBinaryMessage(json.toJson());
@@ -344,6 +352,7 @@ void DrawAndChatServer::userPushPaintResponse(QWebSocket *user, int state, int i
 {
     QJsonDocument json = MakeServerJson("userPushPaintResponse",QJsonObject{
                                             {"state", state},
+                                            {"error", QMetaEnum::fromType<Error>().valueToKey(state)},
                                             {"id", id}
                                         });
 
@@ -353,7 +362,8 @@ void DrawAndChatServer::userPushPaintResponse(QWebSocket *user, int state, int i
 void DrawAndChatServer::userRemovePaintResponse(QWebSocket *user, int state)
 {
     QJsonDocument json = MakeServerJson("userRemovePaintResponse",QJsonObject{
-                                            {"state", state}
+                                            {"state", state},
+                                            {"error", QMetaEnum::fromType<Error>().valueToKey(state)}
                                         });
 
     user->sendBinaryMessage(json.toJson());
@@ -362,7 +372,8 @@ void DrawAndChatServer::userRemovePaintResponse(QWebSocket *user, int state)
 void DrawAndChatServer::userSendMessageResponse(QWebSocket *user, int state)
 {
     QJsonDocument json = MakeServerJson("userSendMessageResponse",QJsonObject{
-                                            {"state", state}
+                                            {"state", state},
+                                            {"error", QMetaEnum::fromType<Error>().valueToKey(state)}
                                         });
 
     user->sendBinaryMessage(json.toJson());

@@ -6,6 +6,9 @@
 
 #include <functional>
 
+#include "clientinfo.h"
+#include "roominfo.h"
+
 class DrawAndChatServer : public QObject
 {
     Q_OBJECT
@@ -21,19 +24,17 @@ public:
         NoThisUser,
         RoomNotFound,
         RoomExisting,
-        ClientNotFound
+        ClientNotFound,
+        UserExisting
     };
-    Q_ENUMS(Error)
+    Q_ENUM(Error)
 
 private:
 
-    typedef QPair<QString, QString> ClientInfoPair;
-    typedef QPair<QString, QWebSocket *> UserIndexPair;
-
     QWebSocketServer _webSocketServer;
-    QMap<QWebSocket *, QPair<QString, QString>> _clientInfoMap;
+    QMap<QWebSocket *, ClientInfo> _clientInfoMap;
 
-    QMap<QString, QMap<QString, QWebSocket *>> _roomUserIndexMap;
+    QMap<QString, RoomInfo> _roomInfoMap;
 
     static QJsonDocument MakeServerJson(const QString &operation, const QJsonObject &arguments);
     static void DebugOutput(QWebSocket *user, const QString& operation);

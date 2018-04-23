@@ -17,8 +17,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += src/main.cpp \
     src/network/drawandchatserver.cpp \
-    src/network/networkinfo.cpp
+    src/network/networkinfo.cpp \
+    src/network/clientinfo.cpp \
+    src/network/roominfo.cpp
 
 HEADERS += \
     src/network/drawandchatserver.h \
-    src/network/networkinfo.h
+    src/network/networkinfo.h \
+    src/network/clientinfo.h \
+    src/network/roominfo.h
