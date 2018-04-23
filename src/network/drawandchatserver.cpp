@@ -70,7 +70,7 @@ void DrawAndChatServer::userLoginRoom(QWebSocket *user, const QString &inUserNam
 {
     if(inUserName.isNull() || inRoomName.isNull())
     {
-        userLoginRoomResponse(user, Error::InvaildArgument);
+        userLoginRoomResponse(user, Error::ArgumentInvaild);
     }
 
     auto clientInfo = _clientInfoMap.find(user);
@@ -92,19 +92,23 @@ void DrawAndChatServer::userLoginRoom(QWebSocket *user, const QString &inUserNam
         auto foundNewRoom = _roomInfoMap.find(inRoomName);
         if(foundNewRoom != _roomInfoMap.cend())
         {
-            auto foundUser = foundNewRoom->users.find(inUserName);
-            if(foundUser == foundNewRoom->users.cend())
+            if(roomPassword == foundNewRoom->password)
             {
-                clientInfo->roomName = inRoomName;
-                clientInfo->userName = inUserName;
+                auto foundUser = foundNewRoom->users.find(inUserName);
+                if(foundUser == foundNewRoom->users.cend())
+                {
+                    clientInfo->roomName = inRoomName;
+                    clientInfo->userName = inUserName;
 
-                foundNewRoom->users.insert(inUserName, user);
+                    foundNewRoom->users.insert(inUserName, user);
 
-                otherLoginRoom(user, inUserName);
+                    otherLoginRoom(user, inUserName);
 
-                userLoginRoomResponse(user, Error::NoError);
+                    userLoginRoomResponse(user, Error::NoError);
+                }
+                else userLoginRoomResponse(user, Error::UserExisting);
             }
-            else userLoginRoomResponse(user, Error::UserExisting);
+            else userLoginRoomResponse(user, Error::RoomPasswordWrong);
         }
         else userLoginRoomResponse(user, Error::RoomNotFound);
     }
@@ -115,7 +119,7 @@ void DrawAndChatServer::userCreateRoom(QWebSocket *user, const QString &inUserNa
 {
     if(inUserName.isNull() || inRoomName.isNull())
     {
-        userCreateRoomResponse(user, Error::InvaildArgument);
+        userCreateRoomResponse(user, Error::ArgumentInvaild);
     }
 
     auto clientInfo = _clientInfoMap.find(user);
@@ -140,7 +144,7 @@ void DrawAndChatServer::userCreateRoom(QWebSocket *user, const QString &inUserNa
             clientInfo->roomName = inRoomName;
             clientInfo->userName = inUserName;
 
-            _roomInfoMap.insert(inRoomName, RoomInfo(RoomInfo::UsersType{ {inUserName, user} }));
+            _roomInfoMap.insert(inRoomName, RoomInfo(RoomInfo::UsersType{ {inUserName, user} }, roomPassword));
 
             userCreateRoomResponse(user, Error::NoError);
         }
@@ -163,7 +167,7 @@ void DrawAndChatServer::userSendMessage(QWebSocket *user, const QString &message
 {
     if(message.isNull())
     {
-        userSendMessageResponse(user, Error::InvaildArgument);
+        userSendMessageResponse(user, Error::ArgumentInvaild);
     }
 
     auto clientInfo = _clientInfoMap.find(user);

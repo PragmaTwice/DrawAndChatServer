@@ -20,12 +20,13 @@ public:
     enum Error
     {
         NoError = 0,
-        InvaildArgument,
+        ArgumentInvaild,
         NoThisUser,
         RoomNotFound,
         RoomExisting,
         ClientNotFound,
-        UserExisting
+        UserExisting,
+        RoomPasswordWrong
     };
     Q_ENUM(Error)
 

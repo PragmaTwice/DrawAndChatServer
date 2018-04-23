@@ -15,8 +15,9 @@ public:
 
     UsersType users;
     DrawDataType drawData;
+    QString password;
 
-    RoomInfo(const UsersType& inUsers = UsersType());
+    RoomInfo(const UsersType& inUsers = UsersType(), const QString& inPassword = QString());
     ~RoomInfo();
 };
 

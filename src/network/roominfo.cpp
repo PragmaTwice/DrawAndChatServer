@@ -1,7 +1,8 @@
 #include "roominfo.h"
 
-RoomInfo::RoomInfo(const RoomInfo::UsersType &inUsers) :
-    users(inUsers)
+RoomInfo::RoomInfo(const RoomInfo::UsersType &inUsers, const QString &inPassword) :
+    users(inUsers),
+    password(inPassword)
 {
 }
 
