@@ -155,12 +155,63 @@ void DrawAndChatServer::userCreateRoom(QWebSocket *user, const QString &inUserNa
 
 void DrawAndChatServer::userPushPaint(QWebSocket *user, int state, const QJsonObject &argList)
 {
+    auto clientInfo = _clientInfoMap.find(user);
+    if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull() && !clientInfo->userName.isNull())
+    {
+        auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+        if(foundRoom != _roomInfoMap.cend())
+        {
+            int key = 0;
+            if(!foundRoom->drawData.empty())
+            {
+                key = (foundRoom->drawData.end()-1).key() + 1;
+            }
+            foundRoom->drawData.insert(
+                        key,
+                        DrawInfo(clientInfo->userName, state, argList.toVariantMap())
+                        );
 
+            userPushPaintResponse(user, Error::NoError, key);
+
+            otherPushPaint(user, clientInfo->userName, key, state, argList);
+
+        }
+        else userPushPaintResponse(user, Error::RoomNotFound, -1);
+
+    }
+    else userPushPaintResponse(user, Error::ClientNotFound, -1);
 }
 
 void DrawAndChatServer::userRemovePaint(QWebSocket *user, int id)
 {
+    auto clientInfo = _clientInfoMap.find(user);
+    if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull() && !clientInfo->userName.isNull())
+    {
+        auto foundRoom = _roomInfoMap.find(clientInfo->roomName);
+        if(foundRoom != _roomInfoMap.cend())
+        {
+            auto foundPaint = foundRoom->drawData.find(id);
+            if(foundPaint != foundRoom->drawData.cend())
+            {
+                if(foundPaint->author == clientInfo->userName)
+                {
+                    foundRoom->drawData.erase(foundPaint);
 
+                    userRemovePaintResponse(user, Error::NoError);
+
+                    otherRemovePaint(user, id);
+
+                }
+                else userRemovePaintResponse(user, Error::PaintAuthorMismatching);
+
+            }
+            else userRemovePaintResponse(user, Error::PaintIdNotFound);
+
+        }
+        else userRemovePaintResponse(user, Error::RoomNotFound);
+
+    }
+    else userRemovePaintResponse(user, Error::ClientNotFound);
 }
 
 void DrawAndChatServer::userSendMessage(QWebSocket *user, const QString &message)
@@ -226,7 +277,7 @@ void DrawAndChatServer::otherSendMessageResponse(QWebSocket *user)
 
 }
 
-void DrawAndChatServer::broadcastToUserInRoom(QWebSocket *user, const std::function<void (QWebSocket*)> &action)
+DrawAndChatServer::Error DrawAndChatServer::broadcastToUserInRoom(QWebSocket *user, const std::function<void (QWebSocket*)> &action)
 {
     auto clientInfo = _clientInfoMap.find(user);
     if(clientInfo != _clientInfoMap.cend() && !clientInfo->roomName.isNull())
@@ -241,8 +292,11 @@ void DrawAndChatServer::broadcastToUserInRoom(QWebSocket *user, const std::funct
                     action(other);
                 }
             }
+            return Error::NoError;
         }
+        else return Error::RoomNotFound;
     }
+    else return Error::ClientNotFound;
 }
 
 void DrawAndChatServer::onNewConnection()
@@ -396,9 +450,10 @@ void DrawAndChatServer::otherLoginRoom(QWebSocket *user, const QString &inUserNa
     });
 }
 
-void DrawAndChatServer::otherPushPaint(QWebSocket *user, int id, int state, const QJsonObject &argList)
+void DrawAndChatServer::otherPushPaint(QWebSocket *user, const QString &inUserName, int id, int state, const QJsonObject &argList)
 {
     QJsonDocument json = MakeServerJson("otherPushPaint",QJsonObject{
+                                            {"userName", inUserName},
                                             {"id", id},
                                             {"paintState", state},
                                             {"paintArguments", argList}

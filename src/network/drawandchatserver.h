@@ -26,7 +26,9 @@ public:
         RoomExisting,
         ClientNotFound,
         UserExisting,
-        RoomPasswordWrong
+        RoomPasswordWrong,
+        PaintIdNotFound,
+        PaintAuthorMismatching
     };
     Q_ENUM(Error)
 
@@ -40,7 +42,7 @@ private:
     static QJsonDocument MakeServerJson(const QString &operation, const QJsonObject &arguments);
     static void DebugOutput(QWebSocket *user, const QString& operation);
 
-    void broadcastToUserInRoom(QWebSocket *user, const std::function<void(QWebSocket*)>& action);
+    DrawAndChatServer::Error broadcastToUserInRoom(QWebSocket *user, const std::function<void(QWebSocket*)>& action);
     Error clearIndexInfo(QWebSocket *user);
 
 private slots:
@@ -79,7 +81,7 @@ public slots:
     void userSendMessageResponse(QWebSocket *user, int state);
 
     void otherLoginRoom(QWebSocket *user, const QString& inUserName);
-    void otherPushPaint(QWebSocket *user, int id, int state, const QJsonObject &argList);
+    void otherPushPaint(QWebSocket *user, const QString& inUserName, int id, int state, const QJsonObject &argList);
     void otherRemovePaint(QWebSocket *user, int id);
     void otherSendMessage(QWebSocket *user, const QString& inUserName, const QString& message);
     void otherLogoutRoom(QWebSocket *user, const QString& inUserName);

@@ -19,10 +19,12 @@ SOURCES += src/main.cpp \
     src/network/drawandchatserver.cpp \
     src/network/networkinfo.cpp \
     src/network/clientinfo.cpp \
-    src/network/roominfo.cpp
+    src/network/roominfo.cpp \
+    src/network/drawinfo.cpp
 
 HEADERS += \
     src/network/drawandchatserver.h \
     src/network/networkinfo.h \
     src/network/clientinfo.h \
-    src/network/roominfo.h
+    src/network/roominfo.h \
+    src/network/drawinfo.h

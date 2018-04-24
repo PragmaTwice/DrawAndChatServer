@@ -5,13 +5,15 @@
 #include <QString>
 #include <QWebSocket>
 
+#include "drawinfo.h"
+
 class RoomInfo
 {
 
 public:
 
     typedef QMap<QString, QWebSocket *> UsersType;
-    typedef QMap<qint32, QVariantMap> DrawDataType;
+    typedef QMap<qint32, DrawInfo> DrawDataType;
 
     UsersType users;
     DrawDataType drawData;
